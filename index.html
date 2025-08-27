@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thinking Styles Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #F0EEE6;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            gap: 30px;
+        }
+        
+        #canvasContainer {
+            width: 550px;
+            height: 550px;
+            background-color: #F0EEE6;
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        .controls {
+            text-align: center;
+        }
+        
+        button {
+            padding: 12px 24px;
+            background-color: transparent;
+            border: 2px solid #333;
+            border-radius: 25px;
+            color: #333;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        button:hover {
+            background-color: rgba(51, 51, 51, 0.05);
+        }
+        
+        .message {
+            max-width: 420px;
+            color: #333;
+            font-family: Georgia, serif;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        
+        .quote {
+            font-style: italic;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        
+        .description {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvasContainer">
+        <canvas id="canvas" width="550" height="550"></canvas>
+    </div>
+    
+    <div class="controls">
+        <button id="toggleButton">Linear Growth</button>
+        
+        <div class="message">
+            <div class="quote">
+                "The associative mind creates entire galaxies of connected understanding where others see just one path."
+            </div>
+            <div class="description">
+                Your mind works like a brilliant constellation, pulling from vast spheres of information 
+                to see patterns others miss entirely. This exceptional way of thinking isn't just different—it's 
+                a profound gift that allows you to understand the world in ways that are both beautiful and uniquely yours.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Animation variables
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let isAssociative = false;
+        let animationTime = 0;
+        let persistentNodes = [];
+        let rotationAngle = 0;
+        let animationFrameId;
+        let transitionProgress = 0;
+        let linearSequence = [];
+        let maxLinearPoints = 8;
+
+        // Toggle button
+        let toggleButton = document.getElementById('toggleButton');
+        toggleButton.addEventListener('click', function() {
+            isAssociative = !isAssociative;
+            toggleButton.textContent = isAssociative ? 'Associative Growth' : 'Linear Growth';
+        });
+
+        // Persistent node class for 3D grid
+        class PersistentNode {
+            constructor(x, y, z, id) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+                this.id = id;
+                this.connections = Math.floor(Math.random() * 120 + 60);
+                this.maxLength = Math.random() * 80 + 40;
+                this.age = 0;
+                this.opacity = 0;
+                this.burstIntensity = Math.random() * 0.8 + 0.2;
+                this.connectionSpeed = Math.random() * 2 + 1;
+                this.hasExploded = false;
+                this.gridConnections = [];
+            }
+
+            update() {
+                this.age++;
+                
+                if (this.age < 120) {
+                    this.opacity = Math.min(1, this.age / 120);
+                } else {
+                    this.opacity = 1;
+                }
+
+                if (this.age === 180) {
+                    this.hasExploded = true;
+                }
+            }
+
+            draw3D(rotation) {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                const cos = Math.cos(rotation);
+                const sin = Math.sin(rotation);
+                
+                const rotatedX = this.x * cos - this.z * sin;
+                const rotatedZ = this.x * sin + this.z * cos;
+                const depth = rotatedZ + 200;
+                
+                const scale = 300 / depth;
+                const screenX = centerX + rotatedX * scale;
+                const screenY = centerY + this.y * scale;
+                
+                ctx.save();
+                ctx.globalAlpha = this.opacity * (0.3 + 0.7 * scale);
+                ctx.translate(screenX, screenY);
+
+                // Draw radial burst initially
+                if (!this.hasExploded && this.age > 30) {
+                    const activeConnections = Math.floor(this.connections * Math.min(1, (this.age - 30) * 0.02));
+                    for (let i = 0; i < activeConnections; i++) {
+                        const angle = (i / this.connections) * Math.PI * 2 + this.age * 0.01;
+                        const connectionLength = this.maxLength * scale * (0.3 + Math.random() * 0.7);
+                        const intensity = this.burstIntensity * Math.sin(this.age * this.connectionSpeed * 0.1 + i);
+                        
+                        if (intensity > 0) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, 0);
+                            ctx.lineTo(
+                                Math.cos(angle) * connectionLength * intensity, 
+                                Math.sin(angle) * connectionLength * intensity
+                            );
+                            ctx.strokeStyle = '#333';
+                            ctx.lineWidth = (0.2 + intensity * 0.3) * scale;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                // Pulsing center
+                const pulse = this.hasExploded ? 1 : Math.sin(this.age * 0.2) * 0.3 + 0.7;
+                const radius = (4 + pulse * 2) * scale;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(51, 51, 51, ${0.8 * pulse})`;
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            drawGridConnections(otherNodes, rotation) {
+                if (!this.hasExploded) return;
+
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                const cos = Math.cos(rotation);
+                const sin = Math.sin(rotation);
+                const rotatedX = this.x * cos - this.z * sin;
+                const rotatedZ = this.x * sin + this.z * cos;
+                const depth = rotatedZ + 200;
+                const scale = 300 / depth;
+                const screenX = centerX + rotatedX * scale;
+                const screenY = centerY + this.y * scale;
+
+                this.gridConnections.forEach(otherId => {
+                    const other = otherNodes.find(n => n.id === otherId);
+                    if (other && other.hasExploded) {
+                        const otherRotatedX = other.x * cos - other.z * sin;
+                        const otherRotatedZ = other.x * sin + other.z * cos;
+                        const otherDepth = otherRotatedZ + 200;
+                        const otherScale = 300 / otherDepth;
+                        const otherScreenX = centerX + otherRotatedX * otherScale;
+                        const otherScreenY = centerY + other.y * otherScale;
+
+                        ctx.beginPath();
+                        ctx.moveTo(screenX, screenY);
+                        ctx.lineTo(otherScreenX, otherScreenY);
+                        ctx.strokeStyle = `rgba(51, 51, 51, ${0.3 * Math.min(scale, otherScale)})`;
+                        ctx.lineWidth = 1 * Math.min(scale, otherScale);
+                        ctx.stroke();
+                    }
+                });
+            }
+        }
+
+        function drawLinearSequence() {
+            const startX = canvas.width * 0.15;
+            const startY = canvas.height / 2;
+            const endX = canvas.width * 0.85;
+            const spacing = (endX - startX) / (maxLinearPoints - 1);
+            
+            if (animationTime % 40 === 0 && linearSequence.length < maxLinearPoints) {
+                linearSequence.push({
+                    x: startX + linearSequence.length * spacing,
+                    y: startY,
+                    age: 0,
+                    letter: String.fromCharCode(65 + linearSequence.length)
+                });
+            }
+            
+            linearSequence.forEach((point, index) => {
+                point.age++;
+                const opacity = Math.min(1, point.age / 30);
+                
+                ctx.save();
+                ctx.globalAlpha = opacity;
+                
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+                ctx.fillStyle = '#333';
+                ctx.fill();
+                
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(point.letter, point.x, point.y - 15);
+                
+                if (index < linearSequence.length - 1 && point.age > 10) {
+                    const nextPoint = linearSequence[index + 1];
+                    if (nextPoint.age > 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(point.x, point.y);
+                        ctx.lineTo(nextPoint.x, nextPoint.y);
+                        ctx.strokeStyle = '#333';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                }
+                
+                ctx.restore();
+            });
+        }
+
+        function spawnPersistentNode() {
+            if (persistentNodes.length < 20) {
+                const x = (Math.random() - 0.5) * 300;
+                const y = (Math.random() - 0.5) * 200;
+                const z = (Math.random() - 0.5) * 200;
+                const id = persistentNodes.length;
+                
+                const newNode = new PersistentNode(x, y, z, id);
+                
+                persistentNodes.forEach(existingNode => {
+                    const distance = Math.sqrt(
+                        Math.pow(newNode.x - existingNode.x, 2) +
+                        Math.pow(newNode.y - existingNode.y, 2) +
+                        Math.pow(newNode.z - existingNode.z, 2)
+                    );
+                    
+                    if (distance < 150 && Math.random() > 0.4) {
+                        newNode.gridConnections.push(existingNode.id);
+                        existingNode.gridConnections.push(id);
+                    }
+                });
+                
+                persistentNodes.push(newNode);
+            }
+        }
+
+        function drawAssociativeGrid() {
+            rotationAngle += 0.008;
+            
+            const nodesWithDepth = persistentNodes.map(node => {
+                const cos = Math.cos(rotationAngle);
+                const sin = Math.sin(rotationAngle);
+                const rotatedZ = node.x * sin + node.z * cos;
+                return { node, depth: rotatedZ + 200 };
+            });
+            
+            nodesWithDepth.sort((a, b) => b.depth - a.depth);
+            
+            persistentNodes.forEach(node => {
+                node.drawGridConnections(persistentNodes, rotationAngle);
+            });
+            
+            nodesWithDepth.forEach(({ node }) => {
+                node.draw3D(rotationAngle);
+            });
+        }
+
+        function animate() {
+            ctx.fillStyle = '#F0EEE6';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            animationTime++;
+
+            const targetProgress = isAssociative ? 1 : 0;
+            const transitionSpeed = 0.02;
+            
+            if (Math.abs(transitionProgress - targetProgress) > 0.01) {
+                transitionProgress += (targetProgress - transitionProgress) * transitionSpeed;
+            } else {
+                transitionProgress = targetProgress;
+            }
+
+            if (transitionProgress < 0.5) {
+                drawLinearSequence();
+                
+                if (persistentNodes.length > 0) {
+                    persistentNodes = [];
+                }
+            } else {
+                if (animationTime % 45 === 0) {
+                    spawnPersistentNode();
+                }
+                
+                persistentNodes.forEach(node => node.update());
+                drawAssociativeGrid();
+                
+                if (linearSequence.length > 0) {
+                    linearSequence = [];
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
